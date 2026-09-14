@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>后台｜Love Card</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>后台回复 💌</h1>
+  <p class="muted">这里显示提交到 Supabase 的所有回复。</p>
+
+  <section id="login">
+    <input id="password" type="password" placeholder="后台密码">
+    <button id="loginBtn">进入后台</button>
+    <p id="loginError"></p>
+  </section>
+
+  <section id="panel" hidden>
+    <div class="bar">
+      <strong id="count">0 条回复</strong>
+      <button id="refresh">刷新</button>
+      <button id="logout">退出</button>
+    </div>
+    <div id="rows"></div>
+  </section>
+</div>
+<script src="config.js"></script>
+<script>
+const ADMIN_PASSWORD = "CHANGE_THIS_PASSWORD";
+let token = null;
+
+const login = document.getElementById("login");
+const panel = document.getElementById("panel");
+const rows = document.getElementById("rows");
+
+document.getElementById("loginBtn").onclick = () => {
+  const p = document.getElementById("password").value;
+  if (p === ADMIN_PASSWORD) {
+    token = "ok";
+    login.hidden = true;
+    panel.hidden = false;
+    load();
+  } else {
+    document.getElementById("loginError").textContent = "密码不正确";
+  }
+};
+
+document.getElementById("logout").onclick = () => {
+  token = null;
+  panel.hidden = true;
+  login.hidden = false;
+};
+
+document.getElementById("refresh").onclick = load;
+
+async function load() {
+  if (!window.SUPABASE_URL || window.SUPABASE_URL.startsWith("YOUR_")) {
+    rows.innerHTML = "<p>请先配置 Supabase。</p>";
+    return;
+  }
+  rows.innerHTML = "<p>加载中……</p>";
+  try {
+    const res = await fetch(
+      `${window.SUPABASE_URL}/rest/v1/love_responses?select=id,answer,activity,date,created_at&order=created_at.desc`,
+      {
+        headers: {
+          "apikey": window.SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${window.SUPABASE_ANON_KEY}`
+        }
+      }
+    );
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    document.getElementById("count").textContent = `${data.length} 条回复`;
+    rows.innerHTML = data.map(x => `
+      <article>
+        <div class="answer">${escapeHtml(x.answer || "")}</div>
+        <div><b>活动：</b>${escapeHtml(x.activity || "")}</div>
+        <div><b>日期：</b>${escapeHtml(x.date || "")}</div>
+        <div><b>提交：</b>${new Date(x.created_at).toLocaleString("zh-CN")}</div>
+      </article>
+    `).join("") || "<p>还没有回复。</p>";
+  } catch(e) {
+    rows.innerHTML = "<p>读取失败。请检查 Supabase 配置和 RLS 策略。</p>";
+  }
+}
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+}
+</script>
+</body>
+</html>
